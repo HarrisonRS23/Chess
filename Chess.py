@@ -251,7 +251,6 @@ def king_in_check(sprite):
 
 # Function to pretty print chessboard for visualization purposes
 def print_chess_board():
-
     print('    ', end=" ")
     for y in range(8):
         if y == 0:
@@ -299,6 +298,7 @@ clock = pygame.time.Clock()
 running = True
 
 def draw_board(i,j):
+    global valid_moves
     board = pygame.Surface((cellSize * DIMENSION, cellSize * DIMENSION))
     board.fill(CREAM)
     for x in range(DIMENSION):
@@ -310,6 +310,13 @@ def draw_board(i,j):
             
             elif (x + y) % 2 == 0:
                 pygame.draw.rect(board, GREEN, (x * cellSize, y * cellSize, cellSize, cellSize))
+
+            my_rect = pygame.Rect(x * cellSize, y * cellSize, cellSize, cellSize)
+
+            # Draw avaliable moves
+            if (x,7-y) in valid_moves:
+                center = my_rect.center
+                pygame.draw.circle(board, GRAY, center, 10)
 
     return board
 
@@ -381,12 +388,13 @@ while running:
                 if (clicked_col, clicked_row) in valid_moves:
                     execute_move(selected_piece, clicked_col, clicked_row)
                     selected_piece = None
-                    board = draw_board(-1,-1)
                     valid_moves = []
-                else:
                     board = draw_board(-1,-1)
+                else:
+                   
                     selected_piece = None
                     valid_moves = []
+                    board = draw_board(-1,-1)
                     for sprite in group:
                         if sprite.was_clicked(event) and sprite.color == current_turn:
                             selected_piece = sprite
