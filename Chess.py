@@ -1,6 +1,22 @@
 import pygame
 import os
 
+"""
+TODO: 
+- Add turn system
+- Add checking the king
+- Add checkmates 
+- Add castling 
+- Add en passant 
+- Add promotions
+- Add draws
+- Add stalemate
+- Add resigning/reset
+
+
+
+"""
+
 class ChessSprite(pygame.sprite.Sprite):
     def __init__(self, board_rect, i, j, image, color, piece_type):
         super().__init__()
@@ -223,7 +239,7 @@ def get_king_moves(sprite):
     print(valid_moves)
     return valid_moves
 
-# TODO: Complete later
+# TODO: Complete function
 def king_in_check(sprite):
     print("is the king in check?")
 
