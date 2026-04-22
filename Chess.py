@@ -4,6 +4,7 @@ import os
 """
 TODO: 
 
+- Add drawing possible moves
 - Add checking the king
 - Add checkmates 
 - Add castling 
@@ -52,6 +53,7 @@ def execute_move(sprite, dst_col, dst_row):
     
     sprite.set_pos(dst_col,dst_row)
     # TODO: Add case to check if the King is in check
+
     # write the moved piece into its new square
     board_state[dst_col][dst_row] = (sprite.color, sprite.piece_type, sprite)
 
@@ -61,6 +63,8 @@ def execute_move(sprite, dst_col, dst_row):
     else:
         current_turn = 0
 
+    global selected_piece
+    selected_piece = None
     print_chess_board()
     
 def kill_piece(col, row):
@@ -284,6 +288,8 @@ WIDTH, HEIGHT = 800, 800
 DIMENSION = 8
 WHITE, BLACK = (255, 255, 255), (0, 0, 0)
 GREEN, CREAM = (115, 149, 82), (235, 236, 208)
+LIGHT_ORANGE = (186, 201, 73) # Select color
+GRAY = (202, 203, 179) # Indicator for valid moves
 cellSize = WIDTH // DIMENSION
 
 pygame.init()
@@ -292,13 +298,22 @@ pygame.display.set_caption("ChessBoard")
 clock = pygame.time.Clock()
 running = True
 
-board = pygame.Surface((cellSize * DIMENSION, cellSize * DIMENSION))
-board.fill(CREAM)
-for x in range(DIMENSION):
-    for y in range(DIMENSION):
-        if (x + y) % 2 == 0:
-            pygame.draw.rect(board, GREEN, (x * cellSize, y * cellSize, cellSize, cellSize))
+def draw_board(i,j):
+    board = pygame.Surface((cellSize * DIMENSION, cellSize * DIMENSION))
+    board.fill(CREAM)
+    for x in range(DIMENSION):
+        for y in range(DIMENSION):
 
+            # Highlighted Piece uses the flip
+            if x == i and y == (7 - j):
+                pygame.draw.rect(board, LIGHT_ORANGE, (x * cellSize, y * cellSize, cellSize, cellSize))
+            
+            elif (x + y) % 2 == 0:
+                pygame.draw.rect(board, GREEN, (x * cellSize, y * cellSize, cellSize, cellSize))
+
+    return board
+
+board = draw_board(-1,-1)
 board_rect = board.get_rect(topleft=(0, 0))
 
 # Loading in pieces
@@ -334,6 +349,9 @@ font = pygame.font.SysFont(None, 36)
 while running:
     event_list = pygame.event.get()
 
+    if selected_piece is not None:
+        board = draw_board(selected_piece.col, selected_piece.row)
+
     for event in event_list:
         if event.type == pygame.QUIT:
             running = False
@@ -363,8 +381,10 @@ while running:
                 if (clicked_col, clicked_row) in valid_moves:
                     execute_move(selected_piece, clicked_col, clicked_row)
                     selected_piece = None
+                    board = draw_board(-1,-1)
                     valid_moves = []
                 else:
+                    board = draw_board(-1,-1)
                     selected_piece = None
                     valid_moves = []
                     for sprite in group:
