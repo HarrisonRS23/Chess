@@ -3,6 +3,7 @@ import os
 
 """
 TODO: 
+
 - Add turn system
 - Add checking the king
 - Add checkmates 
@@ -12,8 +13,6 @@ TODO:
 - Add draws
 - Add stalemate
 - Add resigning/reset
-
-
 
 """
 
@@ -42,10 +41,6 @@ class ChessSprite(pygame.sprite.Sprite):
     def was_clicked(self, event):
         return self.rect.collidepoint(event.pos)
 
-    def update(self, event_list):
-        print()
-
-
 
 def execute_move(sprite, dst_col, dst_row):
 
@@ -60,6 +55,7 @@ def execute_move(sprite, dst_col, dst_row):
     # TODO: Add case to check if the King is in check
     # write the moved piece into its new square
     board_state[dst_col][dst_row] = (sprite.color, sprite.piece_type, sprite)
+    print_chess_board()
     
 def kill_piece(col, row):
     for sprite in group:
@@ -243,6 +239,34 @@ def get_king_moves(sprite):
 def king_in_check(sprite):
     print("is the king in check?")
 
+# Function to pretty print chessboard for visualization purposes
+def print_chess_board():
+
+    print('    ', end=" ")
+    for y in range(8):
+        if y == 0:
+            print('[' + str(y) + ']' ,end=" ")
+        else:
+            print('[' + str(y) + '] ' ,end=" ")
+
+    print()
+
+    for i in range(8):
+        print('[' + str(i) + ']' ,end=" ")
+        for j in range(8):
+            cell = board_state[i][j]
+            if cell is not None:
+                if cell[0] == 0:
+                    color = 'w'
+                else:
+                    color = 'b'
+                print('(' + color + cell[1] + ')',end=" ")
+            else:
+                print('(  )',end=" ")
+
+        print()
+    print('\n')
+            
 
 # Constants
 global selected_piece, valid_moves
@@ -271,6 +295,7 @@ for x in range(DIMENSION):
 
 board_rect = board.get_rect(topleft=(0, 0))
 
+# Loading in pieces
 
 def load_piece(color, name):
     path = os.path.join("Pieces", f"{color}{name}.png")
@@ -297,6 +322,8 @@ for i, fig in enumerate(back_rank):
     add_piece(i, 6, black_images, 1, 'p')
 
 font = pygame.font.SysFont(None, 36)
+
+# Game Loop
 
 while running:
     event_list = pygame.event.get()
