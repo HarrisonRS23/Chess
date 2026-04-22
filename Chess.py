@@ -4,7 +4,6 @@ import os
 """
 TODO: 
 
-- Add turn system
 - Add checking the king
 - Add checkmates 
 - Add castling 
@@ -55,6 +54,13 @@ def execute_move(sprite, dst_col, dst_row):
     # TODO: Add case to check if the King is in check
     # write the moved piece into its new square
     board_state[dst_col][dst_row] = (sprite.color, sprite.piece_type, sprite)
+
+    global current_turn
+    if current_turn == 0:
+        current_turn = 1
+    else:
+        current_turn = 0
+
     print_chess_board()
     
 def kill_piece(col, row):
@@ -269,7 +275,7 @@ def print_chess_board():
             
 
 # Constants
-global selected_piece, valid_moves
+global selected_piece, valid_moves, current_turn
 current_turn = 0
 selected_piece = None
 valid_moves = []
@@ -372,8 +378,7 @@ while running:
 
     group.draw(screen)
 
-    label = font.render("White's Turn" if current_turn == 0 else "Black's Turn",
-                        True, WHITE)
+    label = font.render("White's Turn" if current_turn == 0 else "Black's Turn", True, WHITE)
     screen.blit(label, (10, 10))
 
     pygame.display.flip()
