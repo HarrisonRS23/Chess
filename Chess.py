@@ -366,11 +366,6 @@ while running:
                             selected_piece = sprite
                             valid_moves = get_valid_moves(sprite)
                             break
-        
-        # TO DELETE maybe
-        elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-            selected_piece = None
-            valid_moves = []
 
     screen.fill(BLACK)
     screen.blit(board, board_rect)
