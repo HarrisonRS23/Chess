@@ -1,0 +1,177 @@
+import pygame
+import os
+
+
+class DragOperator:
+    def __init__(self, sprite):
+        self.sprite = sprite
+        self.dragging = False
+        self.rel_pos = (0, 0)
+        self.just_released = False
+        self.start_pos = None
+
+    def update(self, event_list):
+        self.just_released = False
+        for event in event_list:
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                self.dragging = self.sprite.rect.collidepoint(event.pos)
+                if self.dragging:
+                    self.rel_pos = (
+                        event.pos[0] - self.sprite.rect.x,
+                        event.pos[1] - self.sprite.rect.y,
+                    )
+                    # Only record start_pos here, on the click, inside the dragging guard
+                    board = self.sprite.board
+                    i = (self.sprite.rect.centerx - board.left) // (board.width // 8)
+                    j = 7 - (self.sprite.rect.centery - board.top) // (board.height // 8)
+                    self.start_pos = (i, j)
+
+            if event.type == pygame.MOUSEBUTTONUP:
+                if self.dragging:
+                    self.just_released = True
+                self.dragging = False
+
+            if event.type == pygame.MOUSEMOTION and self.dragging:
+                self.sprite.rect.topleft = (
+                    event.pos[0] - self.rel_pos[0],
+                    event.pos[1] - self.rel_pos[1],
+                )
+
+
+class ChessSprite(pygame.sprite.Sprite):
+    def __init__(self, board_rect, i, j, image, color, piece_type):  # Fixed: type -> piece_type
+        super().__init__()
+        self.board = board_rect
+        self.image = image
+        self.color = color
+        self.piece_type = piece_type
+        self.set_pos(i, j)
+        self.drag = DragOperator(self)
+
+    def set_pos(self, i, j):
+        x = self.board.left + self.board.width // 8 * i + self.board.width // 16
+        y = self.board.top + self.board.height // 8 * (7 - j) + self.board.height // 16
+        self.rect = self.image.get_rect(center=(x, y))
+
+    def update(self, event_list):
+        global current_turn
+        if self.color == current_turn:
+            self.drag.update(event_list)
+            if self.drag.just_released:
+                i = max(0, min(7, (self.rect.centerx - self.board.left) // (self.board.width // 8)))
+                j = 7 - max(0, min(7, (self.rect.centery - self.board.top) // (self.board.height // 8)))
+
+                if check_position(i, j, self.piece_type, self.color):
+                    old_i, old_j = self.drag.start_pos
+                    # Capture: remove the sprite that was on the target square
+                    target = board_state[i][j]
+                    if target is not None:
+                        target.kill()
+                    self.set_pos(i, j)
+                    board_state[old_i][old_j] = None
+                    board_state[i][j] = self  # Store the sprite itself
+                    current_turn = 1 - current_turn
+                else:
+                    # Invalid move: snap back to original square
+                    self.set_pos(self.drag.start_pos[0], self.drag.start_pos[1])
+
+
+def check_position(i, j, piece_type, color):
+    cell = board_state[i][j]
+    # Use cell.color instead of cell[0] since board_state stores sprites
+    if cell is not None and cell.color == color:
+        return False  # Can't capture your own piece
+
+    if piece_type == 'p':
+        pass  # Pawn movement rules to be added
+    elif piece_type == 'b':
+        print('bishop')
+    elif piece_type == 'n':
+        print('knight')
+    elif piece_type == 'r':
+        print('rook')
+    elif piece_type == 'q':
+        print('queen')
+    elif piece_type == 'k':
+        print('king')
+
+    return True
+
+
+def load_piece(color, name):
+    path = os.path.join("Pieces", f"{color}{name}.png")
+    image = pygame.image.load(path).convert_alpha()
+    return pygame.transform.smoothscale(image, (cellSize, cellSize))
+
+
+def draw_chessboard():
+    board = pygame.Surface((cellSize * DIMENSION, cellSize * DIMENSION))
+    board.fill(CREAM)
+    for x in range(DIMENSION):
+        for y in range(DIMENSION):
+            if (x + y) % 2 == 0:
+                pygame.draw.rect(board, GREEN, (x * cellSize, y * cellSize, cellSize, cellSize))
+    return board
+
+
+# Constants
+WIDTH, HEIGHT = 800, 800
+DIMENSION = 8
+WHITE, BLACK = (255, 255, 255), (0, 0, 0)
+GREEN, CREAM = (115, 149, 82), (235, 236, 208)
+cellSize = WIDTH // DIMENSION
+
+# pygame setup
+pygame.init()
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("ChessBoard")
+clock = pygame.time.Clock()
+running = True
+
+board = draw_chessboard()
+
+piece_names = ['k', 'q', 'r', 'b', 'n', 'p']
+white_images = {name: load_piece("w", name) for name in piece_names}
+black_images = {name: load_piece("b", name) for name in piece_names}
+
+board_rect = board.get_rect(topleft=(0, 0))
+
+board_state = [[None] * 8 for _ in range(8)]
+
+group = pygame.sprite.Group()
+figures = ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r']
+for i, figure in enumerate(figures):
+    wp = ChessSprite(board_rect, i, 0, white_images[figure], 0, figure)
+    group.add(wp)
+    board_state[i][0] = wp
+
+    wp2 = ChessSprite(board_rect, i, 1, white_images['p'], 0, 'p')
+    group.add(wp2)
+    board_state[i][1] = wp2
+
+    bp = ChessSprite(board_rect, i, 7, black_images[figure], 1, figure)
+    group.add(bp)
+    board_state[i][7] = bp
+
+    bp2 = ChessSprite(board_rect, i, 6, black_images['p'], 1, 'p')  # Fixed: color 1 not 0
+    group.add(bp2)
+    board_state[i][6] = bp2
+
+# White is 0, black is 1
+current_turn = 0
+
+while running:
+    event_list = pygame.event.get()
+    for event in event_list:
+        if event.type == pygame.QUIT:
+            running = False
+
+    screen.fill(BLACK)
+    screen.blit(board, board_rect)
+    group.update(event_list)
+    group.draw(screen)
+
+    pygame.display.flip()
+    clock.tick(60)
+
+pygame.quit()
