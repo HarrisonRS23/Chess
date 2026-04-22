@@ -3,8 +3,6 @@ import os
 
 """
 TODO: 
-
-- Add drawing possible moves
 - Add checking the king
 - Add checkmates 
 - Add castling 
@@ -315,8 +313,21 @@ def draw_board(i,j):
 
             # Draw avaliable moves
             if (x,7-y) in valid_moves:
+
                 center = my_rect.center
-                pygame.draw.circle(board, GRAY, center, 10)
+
+                if 0 <= x < 8 and 0 <= y < 8:
+                    if board_state[x][7-y] is not None and board_state[x][7-y][0] != selected_piece.color: 
+                        # enemy piece, can capture
+                        pygame.draw.circle(board, GRAY, center, 45, 3)
+                        continue
+                
+                if board_state[x][7-y] is not None and board_state[x][7-y][0] == selected_piece.color: 
+                    continue
+                else:
+                    pygame.draw.circle(board, GRAY, center, 10)
+
+               
 
     return board
 
