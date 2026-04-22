@@ -3,6 +3,7 @@ import os
 
 """
 TODO: 
+- Add sound effects
 - Add checking the king
 - Add checkmates 
 - Add castling 
@@ -43,13 +44,18 @@ class ChessSprite(pygame.sprite.Sprite):
 def execute_move(sprite, dst_col, dst_row):
 
     # Kill piece 
+    killed = False
     if(board_state[dst_col][dst_row] is not None):
         board_state[dst_col][dst_row] = None
         kill_piece(dst_col,dst_row)
+        killed = True
 
     # TODO: Check if Promoting
     
     sprite.set_pos(dst_col,dst_row)
+    if not killed:
+        move_sound.play()
+
     # TODO: Add case to check if the King is in check
 
     # write the moved piece into its new square
@@ -69,6 +75,7 @@ def kill_piece(col, row):
     for sprite in group:
         if sprite.col == col and sprite.row == row:
             sprite.kill()
+            capture_sound.play()
 
 def get_valid_moves(sprite):
     piece_type = sprite.piece_type
@@ -240,7 +247,6 @@ def get_king_moves(sprite):
         if 0 <= xCandidate < 8 and 0 <= yCandidate < 8:
             valid_moves.append((xCandidate, yCandidate))
 
-    print(valid_moves)
     return valid_moves
 
 # TODO: Complete function
@@ -362,6 +368,16 @@ for i, fig in enumerate(back_rank):
 
 font = pygame.font.SysFont(None, 36)
 
+# Sound effects
+
+pygame.mixer.init()
+capture_sound = pygame.mixer.Sound('Effects/capture.mp3')
+castle_sound = pygame.mixer.Sound('Effects/castle.mp3')
+game_end_sound = pygame.mixer.Sound('Effects/game-end.mp3')
+illegal_sound = pygame.mixer.Sound('Effects/illegal.mp3')
+move_sound = pygame.mixer.Sound('Effects/move-self.mp3')
+
+
 # Game Loop
 
 while running:
@@ -402,10 +418,16 @@ while running:
                     valid_moves = []
                     board = draw_board(-1,-1)
                 else:
-                   
+
+                    # TODO: Change this to only illegal moves in check
+                    if board_state[clicked_col][clicked_row] is None:
+                        illegal_sound.play()
+
+
                     selected_piece = None
                     valid_moves = []
                     board = draw_board(-1,-1)
+                    
                     for sprite in group:
                         if sprite.was_clicked(event) and sprite.color == current_turn:
                             selected_piece = sprite
