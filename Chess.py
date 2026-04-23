@@ -12,7 +12,6 @@ TODO:
 - Add resigning/reset
 - Add sidebar of some sort
 - Finish sound effects
-
 """
 
 class ChessSprite(pygame.sprite.Sprite):
@@ -46,6 +45,7 @@ class ChessSprite(pygame.sprite.Sprite):
 
 
 def execute_move(sprite, dst_col, dst_row):
+
 
     # Kill piece 
     killed = False
@@ -84,11 +84,13 @@ def execute_move(sprite, dst_col, dst_row):
     # write the moved piece into its new square
     board_state[dst_col][dst_row] = (sprite.color, sprite.piece_type, sprite)
 
+    king_in_check(find_king())
+
     global current_turn
-    #if current_turn == 0:
-        #current_turn = 1
-   # else:
-       #current_turn = 0
+    if current_turn == 0:
+        current_turn = 1
+    else:
+       current_turn = 0
 
     global selected_piece
     selected_piece = None
@@ -108,7 +110,6 @@ def castled_short(sprite):
     rook.set_pos(5,row)
     board_state[5][row] = (rook.color, rook.piece_type, rook)
 
-
 def castled_long(sprite):
 
     castle_sound.play()
@@ -121,7 +122,6 @@ def castled_long(sprite):
     rook = board_state[0][row][2]
     rook.set_pos(3,row)
     board_state[3][row] = (rook.color, rook.piece_type, rook)
-
 
 def kill_piece(col, row):
     for sprite in group:
@@ -167,9 +167,9 @@ def get_pawn_moves(sprite):
     
     # Diagonal takes
 
-    if sprite.col + 1 < 8 and board_state[sprite.col + 1][sprite.row + direction] is not None:
+    if sprite.col + 1 < 8 and board_state[sprite.col + 1][sprite.row + direction] is not None and board_state[sprite.col + 1][sprite.row + direction][0] is not sprite.color:
         valid_moves.append((sprite.col + 1,sprite.row + direction))
-    if sprite.col - 1 >= 0 and board_state[sprite.col - 1][sprite.row + direction] is not None:
+    if sprite.col - 1 >= 0 and board_state[sprite.col - 1][sprite.row + direction] is not None and board_state[sprite.col - 1][sprite.row + direction][0] is not sprite.color:
         valid_moves.append((sprite.col - 1,sprite.row + direction))
 
     # En-passant (Implement Later)
@@ -189,7 +189,9 @@ def get_knight_moves(sprite):
         xCandidate = x0 + x
         yCandidate = y0 + y
         if 0 <= xCandidate < 8 and 0 <= yCandidate < 8:
-            valid_moves.append((xCandidate, yCandidate))
+            if board_state[xCandidate][yCandidate] is None or \
+            board_state[xCandidate][yCandidate][0] != sprite.color:
+                valid_moves.append((xCandidate, yCandidate))
 
     return valid_moves
 
@@ -223,7 +225,7 @@ def get_rook_moves(sprite):
             break  # either way, stop here
         valid_moves.append((x_right, y))
 
-
+    # move in left direction
     for x_left in range(x - 1, -1, -1):
         if board_state[x_left][y] is not None:
             if board_state[x_left][y][0] != sprite.color:  # enemy piece, can capture
@@ -297,7 +299,8 @@ def get_king_moves(sprite):
         xCandidate = x0 + x
         yCandidate = y0 + y
         if 0 <= xCandidate < 8 and 0 <= yCandidate < 8:
-            valid_moves.append((xCandidate, yCandidate))
+            if board_state[xCandidate][yCandidate] is None or board_state[xCandidate][yCandidate][0] != sprite.color:
+                valid_moves.append((xCandidate, yCandidate))
 
     # Check Castling 
 
@@ -305,17 +308,17 @@ def get_king_moves(sprite):
        
         row = 0 if sprite.color == 0 else 7
 
-        print(can_castle_short())
-        print(can_castle_long())
+        print(can_castle_short(sprite))
+        print(can_castle_long(sprite))
 
-        if can_castle_short():
+        if can_castle_short(sprite):
             valid_moves.append((6,row))
-        if can_castle_long():
+        if can_castle_long(sprite):
            valid_moves.append((2,row))
 
     return valid_moves
 
-def can_castle_short():
+def can_castle_short(sprite):
     row = 0 if sprite.color == 0 else 7
      
     for i in range(2): 
@@ -323,8 +326,10 @@ def can_castle_short():
             return False
     if board_state[7][row] is not None and board_state[7][row][2].has_moved == False:
         return True
+    
+    return False
 
-def can_castle_long():
+def can_castle_long(sprite):
     row = 0 if sprite.color == 0 else 7
      
     for i in range(3): 
@@ -332,10 +337,109 @@ def can_castle_long():
             return False
     if board_state[0][row] is not None and board_state[0][row][2].has_moved == False:
         return True
+    
+    return False
+
+def find_king():
+    for i in range(8):
+        for j in range(8):
+            cell = board_state[i][j]
+            if cell is not None and cell[0] == current_turn and cell[1] == 'k':
+                return cell[2]   
 
 # TODO: Complete function
 def king_in_check(sprite):
-    print("is the king in check?")
+
+    x = sprite.col
+    y = sprite.row
+
+    # Rook movements
+
+    # move in up motion
+    for y_up in range(y + 1, 8):
+        if board_state[x][y_up] is not None:
+            if board_state[x][y_up][0] != sprite.color:  # enemy piece, can capture
+                if board_state[x][y_up][1] == 'q' or board_state[x][y_up][1] == 'r':
+                    print('king in check')
+                    return True
+            break
+                
+
+    # move in down motion
+    for y_up in range(y - 1, -1, -1):
+        if board_state[x][y_up] is not None:
+            if board_state[x][y_up][0] != sprite.color:  # enemy piece, can capture
+                if board_state[x][y_up][1] == 'q' or board_state[x][y_up][1] == 'r':
+                    print('king in check')
+                    return True
+            break
+
+    # move in right motion
+    for x_right in range(x + 1, 8):
+        if board_state[x_right][y] is not None:
+            if board_state[x_right][y][0] != sprite.color:  # enemy piece, can capture
+                if board_state[x_right][y][1] == 'q' or board_state[x_right][y][1] == 'r':
+                    print('king in check')
+                    return True
+            break
+
+    # move in left direction
+    for x_left in range(x - 1, -1, -1):
+        if board_state[x_left][y] is not None:
+            if board_state[x_left][y][0] != sprite.color:  # enemy piece, can capture
+                if board_state[x_left][y][1] == 'q' or board_state[x_left][y][1] == 'r':
+                        print('king in check')
+                        return True
+            break
+            
+    
+    # Bishop movement
+
+    # move in up right
+    for n in range(1, 8):
+        if 0 <= x+n < 8 and 0 <= y+n < 8:
+            if board_state[x + n][y + n] is not None:
+                if board_state[x+n][y+n][0] != sprite.color:  # enemy piece, can capture
+                    if board_state[x+n][y+n][1] == 'q' or board_state[x+n][y+n][1] == 'b':
+                        print("king in check")
+                        return True
+                break
+                
+    
+    # move in up left motion
+    for n in range(1, 8):
+        if 0 <= x-n < 8 and 0 <= y+n < 8:
+            if board_state[x - n][y + n] is not None:
+                if board_state[x-n][y+n][0] != sprite.color:  # enemy piece, can capture
+                    if board_state[x-n][y+n][1] == 'q' or board_state[x-n][y+n][1] == 'b':
+                        print("king in check")
+                        return True
+                break
+            
+
+    # move in down right
+    for n in range(1, 8):
+        if 0 <= x+n < 8 and 0 <= y-n < 8:
+            if board_state[x + n][y - n] is not None:
+                if board_state[x+n][y-n][0] != sprite.color:  # enemy piece, can capture
+                    if board_state[x+n][y-n][1] == 'q' or board_state[x+n][y-n][1] == 'b':
+                        print("king in check")
+                        return True
+                break
+
+    # move in down left
+    for n in range(1, 8):
+        if 0 <= x-n < 8 and 0 <= y-n < 8:
+            if board_state[x - n][y - n] is not None:
+                if board_state[x+n][y-n][0] != sprite.color:  # enemy piece, can capture
+                    if board_state[x+n][y-n][1] == 'q' or board_state[x+n][y-n][1] == 'b':
+                            print("king in check")
+                            return True
+                break
+
+
+    return False
+    
 
 # Function to pretty print chessboard for visualization purposes
 def print_chess_board():
