@@ -3,15 +3,15 @@ import os
 
 """
 TODO: 
-- Add sound effects
 - Add checking the king
 - Add checkmates 
-- Add castling 
 - Add en passant 
 - Add promotions
 - Add draws
 - Add stalemate
 - Add resigning/reset
+- Add sidebar of some sort
+- Finish sound effects
 
 """
 
@@ -26,6 +26,10 @@ class ChessSprite(pygame.sprite.Sprite):
         self.clicked = False
         self.piece_type = piece_type
         self.set_pos(i, j)
+        if piece_type == 'r':
+            self.has_moved = False
+        if piece_type == 'k':
+            self.has_moved = False
 
     def set_pos(self, i, j):
         # Clear position of old piece
@@ -51,8 +55,27 @@ def execute_move(sprite, dst_col, dst_row):
         killed = True
 
     # TODO: Check if Promoting
-    
+
+    row = 0 if sprite.color == 0 else 7
+
+    if(sprite.piece_type == 'k' and not sprite.has_moved):
+        if((dst_col,dst_row) == (6,row)):
+            castled_short(sprite)
+            sprite.has_moved = True
+            return
+
+        elif ((dst_col,dst_row) == (2,row)):
+            castled_long(sprite)
+            sprite.has_moved = True
+            return
+
     sprite.set_pos(dst_col,dst_row)
+
+    # Cannot Castle if moved
+    if(sprite.piece_type == 'k' or sprite.piece_type == 'r'):
+        sprite.has_moved = True
+
+
     if not killed:
         move_sound.play()
 
@@ -62,15 +85,44 @@ def execute_move(sprite, dst_col, dst_row):
     board_state[dst_col][dst_row] = (sprite.color, sprite.piece_type, sprite)
 
     global current_turn
-    if current_turn == 0:
-        current_turn = 1
-    else:
-        current_turn = 0
+    #if current_turn == 0:
+        #current_turn = 1
+   # else:
+       #current_turn = 0
 
     global selected_piece
     selected_piece = None
     print_chess_board()
     
+
+def castled_short(sprite):
+
+    castle_sound.play()
+    row = 0 if sprite.color == 0 else 7
+
+    # Move King
+    sprite.set_pos(6,row)
+    board_state[6][row] = (sprite.color, sprite.piece_type, sprite)
+    # Move Rook
+    rook = board_state[7][row][2]
+    rook.set_pos(5,row)
+    board_state[5][row] = (rook.color, rook.piece_type, rook)
+
+
+def castled_long(sprite):
+
+    castle_sound.play()
+    row = 0 if sprite.color == 0 else 7
+
+    # Move King
+    sprite.set_pos(2,row)
+    board_state[2][row] = (sprite.color, sprite.piece_type, sprite)
+    # Move Rook
+    rook = board_state[0][row][2]
+    rook.set_pos(3,row)
+    board_state[3][row] = (rook.color, rook.piece_type, rook)
+
+
 def kill_piece(col, row):
     for sprite in group:
         if sprite.col == col and sprite.row == row:
@@ -117,7 +169,7 @@ def get_pawn_moves(sprite):
 
     if sprite.col + 1 < 8 and board_state[sprite.col + 1][sprite.row + direction] is not None:
         valid_moves.append((sprite.col + 1,sprite.row + direction))
-    if sprite.col - 1 > 0 and board_state[sprite.col - 1][sprite.row + direction] is not None:
+    if sprite.col - 1 >= 0 and board_state[sprite.col - 1][sprite.row + direction] is not None:
         valid_moves.append((sprite.col - 1,sprite.row + direction))
 
     # En-passant (Implement Later)
@@ -247,7 +299,39 @@ def get_king_moves(sprite):
         if 0 <= xCandidate < 8 and 0 <= yCandidate < 8:
             valid_moves.append((xCandidate, yCandidate))
 
+    # Check Castling 
+
+    if sprite.has_moved == False:
+       
+        row = 0 if sprite.color == 0 else 7
+
+        print(can_castle_short())
+        print(can_castle_long())
+
+        if can_castle_short():
+            valid_moves.append((6,row))
+        if can_castle_long():
+           valid_moves.append((2,row))
+
     return valid_moves
+
+def can_castle_short():
+    row = 0 if sprite.color == 0 else 7
+     
+    for i in range(2): 
+        if board_state[5+i][row] is not None:
+            return False
+    if board_state[7][row] is not None and board_state[7][row][2].has_moved == False:
+        return True
+
+def can_castle_long():
+    row = 0 if sprite.color == 0 else 7
+     
+    for i in range(3): 
+        if board_state[3-i][row] is not None:
+            return False
+    if board_state[0][row] is not None and board_state[0][row][2].has_moved == False:
+        return True
 
 # TODO: Complete function
 def king_in_check(sprite):
@@ -325,7 +409,7 @@ def draw_board(i,j):
                 if 0 <= x < 8 and 0 <= y < 8:
                     if board_state[x][7-y] is not None and board_state[x][7-y][0] != selected_piece.color: 
                         # enemy piece, can capture
-                        pygame.draw.circle(board, GRAY, center, 45, 3)
+                        pygame.draw.circle(board, GRAY, center, 49, 7)
                         continue
                 
                 if board_state[x][7-y] is not None and board_state[x][7-y][0] == selected_piece.color: 
