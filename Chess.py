@@ -5,7 +5,6 @@ import os
 TODO: 
 - Add checkmates 
 - Add en passant 
-- Add promotions
 - Add draws
 - Add stalemate
 - Add resigning/reset
@@ -69,8 +68,6 @@ def execute_move(sprite, dst_col, dst_row):
         kill_piece(dst_col, dst_row)
         killed = True
 
-    # TODO: Check if Promoting
-
     row = 0 if sprite.color == 0 else 7
 
     if sprite.piece_type == 'k' and not sprite.has_moved:
@@ -90,6 +87,17 @@ def execute_move(sprite, dst_col, dst_row):
     if sprite.piece_type == 'k' or sprite.piece_type == 'r':
         sprite.has_moved = True
 
+    promote_row = 0 if sprite.color == 1 else 7
+
+    if(sprite.piece_type == 'p' and sprite.row == promote_row):
+        global show_popup, popup_type, promoting_pawn
+        show_popup = True
+        popup_type = 'promotion'
+        promoting_pawn = sprite
+        # Sound and turn switch happen after promotion choice, so return early
+        return
+        
+
     # Write the moved piece into its new square
     board_state[dst_col][dst_row] = (sprite.color, sprite.piece_type, sprite)
 
@@ -105,7 +113,6 @@ def execute_move(sprite, dst_col, dst_row):
         move_sound.play()
 
     switch_turns()
-
 
 def switch_turns():
     global current_turn
@@ -171,6 +178,7 @@ def get_pawn_moves(sprite):
         valid_moves.append((sprite.col - 1, sprite.row + direction))
 
     # En-passant (Implement Later)
+
     return valid_moves
 
 def get_knight_moves(sprite):
@@ -394,7 +402,8 @@ def king_in_check(sprite, board):
     # Pawn
     pawn_direction = 1 if sprite.color == 0 else -1
     for dx in [-1, 1]:
-        px, py = x + dx, y + pawn_direction
+        px = x + dx
+        py = y + pawn_direction
         if 0 <= px < 8 and 0 <= py < 8:
             if board_state[px][py] is not None and board_state[px][py][0] != sprite.color:
                 if board_state[px][py][1] == 'p':
@@ -427,11 +436,40 @@ def print_chess_board():
         print()
     print('\n')
 
-# Constants
+def draw_promotion_popup(color):
+    overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    overlay.fill((0, 0, 0, 150))  # semi-transparent dark overlay
+    screen.blit(overlay, (0, 0))
+
+    popup_w, popup_h = 400, 120
+    popup_x = WIDTH // 2 - popup_w // 2
+    popup_y = HEIGHT // 2 - popup_h // 2
+    pygame.draw.rect(screen, CREAM, (popup_x, popup_y, popup_w, popup_h), border_radius=10)
+    pygame.draw.rect(screen, BLACK, (popup_x, popup_y, popup_w, popup_h), 2, border_radius=10)
+
+    label = font.render("Choose promotion:", True, BLACK)
+    screen.blit(label, (popup_x + 10, popup_y + 8))
+
+    images = white_images if color == 0 else black_images
+    pieces = ['q', 'r', 'b', 'n']
+    rects = []
+    for idx, piece in enumerate(pieces):
+        rect = pygame.Rect(popup_x + 10 + idx * 95, popup_y + 40, 80, 70)
+        pygame.draw.rect(screen, GREEN if (idx % 2 == 0) else CREAM, rect, border_radius=6)
+        screen.blit(pygame.transform.smoothscale(images[piece], (80, 70)), rect.topleft)
+        rects.append((rect, piece))
+
+    return rects
+
+
+# Constants 
 global selected_piece, valid_moves, current_turn
 current_turn = 0
 selected_piece = None
 valid_moves = []
+show_popup = False
+popup_type = None   # 'promotion'
+promoting_pawn = None
 
 WIDTH, HEIGHT = 800, 800
 DIMENSION = 8
@@ -519,8 +557,7 @@ check_sound = pygame.mixer.Sound('Effects/move-check.mp3')
 while running:
     event_list = pygame.event.get()
 
-    if selected_piece is not None:
-        board = draw_board(selected_piece.col, selected_piece.row)
+    promotion_rects = []
 
     for event in event_list:
         if event.type == pygame.QUIT:
@@ -528,7 +565,11 @@ while running:
 
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
 
-            if selected_piece is None:
+            if show_popup and popup_type == 'promotion':
+                # Click is consumed by the popup — check promotion_rects below
+                pass
+
+            elif selected_piece is None:
                 for sprite in group:
                     if sprite.was_clicked(event) and sprite.color == current_turn:
                         selected_piece = sprite
@@ -553,11 +594,9 @@ while running:
                 else:
                     if board_state[clicked_col][clicked_row] is None:
                         illegal_sound.play()
-
                     selected_piece = None
                     valid_moves = []
                     board = draw_board(-1, -1)
-
                     for sprite in group:
                         if sprite.was_clicked(event) and sprite.color == current_turn:
                             selected_piece = sprite
@@ -565,11 +604,43 @@ while running:
                             break
 
     screen.fill(BLACK)
+
+    if selected_piece is not None:
+        board = draw_board(selected_piece.col, selected_piece.row)
+
     screen.blit(board, board_rect)
     group.draw(screen)
 
     label = font.render("White's Turn" if current_turn == 0 else "Black's Turn", True, WHITE)
     screen.blit(label, (10, 10))
+
+    if show_popup and popup_type == 'promotion':
+        promotion_rects = draw_promotion_popup(promoting_pawn.color)
+
+        # Check for click on a promotion piece
+        mouse = pygame.mouse.get_pressed()
+        if mouse[0]:
+            mouse_pos = pygame.mouse.get_pos()
+            for rect, piece in promotion_rects:
+                if rect.collidepoint(mouse_pos):
+                    images = white_images if promoting_pawn.color == 0 else black_images
+                    promoting_pawn.image = pygame.transform.smoothscale(images[piece], (cellSize, cellSize))
+                    promoting_pawn.piece_type = piece
+                    board_state[promoting_pawn.col][promoting_pawn.row] = (
+                        promoting_pawn.color, piece, promoting_pawn
+                    )
+                    show_popup = False
+                    popup_type = None
+
+                    opponent_color = 1 - current_turn
+                    opponent_king = find_king_by_color(opponent_color)
+                    if king_in_check(opponent_king, board_state):
+                        check_sound.play()
+                    else:
+                        move_sound.play()
+
+                    switch_turns()
+                    break
 
     pygame.display.flip()
     clock.tick(60)
