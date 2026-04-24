@@ -3,7 +3,6 @@ import os
 
 """
 TODO: 
-- Add checkmates 
 - Add en passant 
 - Add draws
 - Add stalemate
@@ -40,6 +39,8 @@ class ChessSprite(pygame.sprite.Sprite):
 
 
 def execute_move(sprite, dst_col, dst_row):
+
+    
 
     # Save state and simulate move for check validation
     original_src = board_state[sprite.col][sprite.row]
@@ -115,11 +116,15 @@ def execute_move(sprite, dst_col, dst_row):
     switch_turns()
 
 def switch_turns():
+
     global current_turn
     current_turn = 1 - current_turn
     global selected_piece
     selected_piece = None
     print_chess_board()
+
+    if(is_checkmate()):
+        print("game over")
 
 def castled_short(sprite):
     castle_sound.play()
@@ -455,15 +460,70 @@ def draw_promotion_popup(color):
     rects = []
     for idx, piece in enumerate(pieces):
         rect = pygame.Rect(popup_x + 10 + idx * 95, popup_y + 40, 80, 70)
-        pygame.draw.rect(screen, GREEN if (idx % 2 == 0) else CREAM, rect, border_radius=6)
+        pygame.draw.rect(screen, GREEN, rect, border_radius=6)
         screen.blit(pygame.transform.smoothscale(images[piece], (80, 70)), rect.topleft)
         rects.append((rect, piece))
 
     return rects
 
 
-def check_checkmate():
-    print()
+"""
+Generate the list of pseudo-legal moves for the side to move. 
+By pseudo-legal, I mean don't bother to verify whether the generated move leaves that side's King in check. 
+Omitting this verification can save time validating moves that are never searched.
+
+For each move that is searched, validate that it doesn't leave the side to move in check.
+
+If every move leaves the King in check, then the side to move has either been mated or it's stalemate.
+
+If the side to move is currently in check, then it's mate. Otherwise it's stalemate.
+
+"""
+
+def is_checkmate():
+
+    if get_king_moves(find_king_by_color(current_turn)) != []:
+        return False
+    
+    pseudo_legal = []
+    
+    for i in range(8):
+        for j in range(8):
+            cell = board_state[i][j]
+            if cell is not None and cell[0] == current_turn:
+                pseudo_legal.append((get_valid_moves(cell[2]), cell))
+
+    for moves, cell in pseudo_legal:
+        piece = cell[2]
+        for move in list(moves):  # iterate over a copy when removing
+            dst_col, dst_row = move
+            original_src = board_state[piece.col][piece.row]
+            original_dst = board_state[dst_col][dst_row]
+            old_col, old_row = piece.col, piece.row
+
+            board_state[piece.col][piece.row] = None
+            board_state[dst_col][dst_row] = (piece.color, piece.piece_type, piece)
+            piece.col, piece.row = dst_col, dst_row
+
+            in_check = king_in_check(find_king_by_color(current_turn), board_state)
+
+            piece.col, piece.row = old_col, old_row
+            board_state[old_col][old_row] = original_src
+            board_state[dst_col][dst_row] = original_dst
+
+            if in_check:
+                moves.remove(move)
+
+    all_legal = [m for moves, cell in pseudo_legal for m in moves]
+    if not all_legal:
+        if king_in_check(find_king_by_color(current_turn), board_state):
+            print("Checkmate")
+            return True
+        else:
+            print("Stalemate!")
+            return False
+
+    return False
 
 # Constants 
 global selected_piece, valid_moves, current_turn
