@@ -46,6 +46,16 @@ class ChessSprite(pygame.sprite.Sprite):
 
 def execute_move(sprite, dst_col, dst_row):
 
+    possible_board_state = board_state
+
+
+
+    possible_board_state[dst_col][dst_row] = (sprite.color, sprite.piece_type, sprite)
+    
+    if king_in_check(find_king(), possible_board_state):
+        illegal_sound.play()
+        return
+    
 
     # Kill piece 
     killed = False
@@ -84,7 +94,7 @@ def execute_move(sprite, dst_col, dst_row):
     # write the moved piece into its new square
     board_state[dst_col][dst_row] = (sprite.color, sprite.piece_type, sprite)
 
-    king_in_check(find_king())
+    
 
     global current_turn
     if current_turn == 0:
@@ -167,9 +177,9 @@ def get_pawn_moves(sprite):
     
     # Diagonal takes
 
-    if sprite.col + 1 < 8 and board_state[sprite.col + 1][sprite.row + direction] is not None and board_state[sprite.col + 1][sprite.row + direction][0] is not sprite.color:
+    if sprite.col + 1 < 8 and board_state[sprite.col + 1][sprite.row + direction] is not None and board_state[sprite.col + 1][sprite.row + direction][0] != sprite.color:
         valid_moves.append((sprite.col + 1,sprite.row + direction))
-    if sprite.col - 1 >= 0 and board_state[sprite.col - 1][sprite.row + direction] is not None and board_state[sprite.col - 1][sprite.row + direction][0] is not sprite.color:
+    if sprite.col - 1 >= 0 and board_state[sprite.col - 1][sprite.row + direction] is not None and board_state[sprite.col - 1][sprite.row + direction][0] != sprite.color:
         valid_moves.append((sprite.col - 1,sprite.row + direction))
 
     # En-passant (Implement Later)
@@ -347,11 +357,12 @@ def find_king():
             if cell is not None and cell[0] == current_turn and cell[1] == 'k':
                 return cell[2]   
 
-# TODO: Complete function
-def king_in_check(sprite):
+def king_in_check(sprite, board):
 
     x = sprite.col
     y = sprite.row
+
+    board_state = board
 
     # Rook movements
 
@@ -431,11 +442,28 @@ def king_in_check(sprite):
     for n in range(1, 8):
         if 0 <= x-n < 8 and 0 <= y-n < 8:
             if board_state[x - n][y - n] is not None:
-                if board_state[x+n][y-n][0] != sprite.color:  # enemy piece, can capture
-                    if board_state[x+n][y-n][1] == 'q' or board_state[x+n][y-n][1] == 'b':
+                if board_state[x-n][y-n][0] != sprite.color:  # enemy piece, can capture
+                    if board_state[x-n][y-n][1] == 'q' or board_state[x-n][y-n][1] == 'b':
                             print("king in check")
                             return True
                 break
+
+
+    # Knight Movement
+
+    x0 = sprite.col
+    y0 = sprite.row
+
+    deltas = [(-2, -1), (-2, +1), (+2, -1), (+2, +1), (-1, -2), (-1, +2), (+1, -2), (+1, +2)]
+
+    for (x, y) in deltas:
+        xCandidate = x0 + x
+        yCandidate = y0 + y
+        if 0 <= xCandidate < 8 and 0 <= yCandidate < 8:
+            if board_state[xCandidate][yCandidate] is not None and board_state[xCandidate][yCandidate][0] != sprite.color:
+                if board_state[xCandidate][yCandidate][1] == 'n':
+                            print("king in check")
+                            return True
 
 
     return False
