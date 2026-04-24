@@ -462,6 +462,9 @@ def draw_promotion_popup(color):
     return rects
 
 
+def check_checkmate():
+    print()
+
 # Constants 
 global selected_piece, valid_moves, current_turn
 current_turn = 0
