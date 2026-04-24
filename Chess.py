@@ -124,7 +124,7 @@ def switch_turns():
     print_chess_board()
 
     if(is_checkmate()):
-        print("game over")
+        game_over(is_checkmate=True)
 
 def castled_short(sprite):
     castle_sound.play()
@@ -517,13 +517,45 @@ def is_checkmate():
     all_legal = [m for moves, cell in pseudo_legal for m in moves]
     if not all_legal:
         if king_in_check(find_king_by_color(current_turn), board_state):
-            print("Checkmate")
+            game_over(is_checkmate=True)
             return True
         else:
-            print("Stalemate!")
-            return False
+            game_over(is_checkmate=False)
+            return True  # return True either way so switch_turns knows game ended
 
     return False
+
+def game_over(is_checkmate):
+    global game_over_flag, game_over_message
+    game_over_flag = True
+    game_end_sound.play()
+    winner = 1 - current_turn
+    if is_checkmate:
+        game_over_message = "Checkmate! " + ("White" if winner == 0 else "Black") + " wins!"
+    else:
+        game_over_message = "Stalemate! It's a draw!"
+
+
+def draw_game_over_popup():
+    overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    overlay.fill((0, 0, 0, 150))
+    screen.blit(overlay, (0, 0))
+
+    popup_w, popup_h = 400, 120
+    popup_x = WIDTH // 2 - popup_w // 2
+    popup_y = HEIGHT // 2 - popup_h // 2
+    pygame.draw.rect(screen, CREAM, (popup_x, popup_y, popup_w, popup_h), border_radius=10)
+    pygame.draw.rect(screen, BLACK, (popup_x, popup_y, popup_w, popup_h), 2, border_radius=10)
+
+    label = font.render(game_over_message, True, BLACK)
+    screen.blit(label, (popup_x + 20, popup_y + 20))
+
+    restart_rect = pygame.Rect(popup_x + 120, popup_y + 60, 160, 40)
+    pygame.draw.rect(screen, GREEN, restart_rect, border_radius=6)
+    btn_label = font.render("Play Again", True, WHITE)
+    screen.blit(btn_label, (restart_rect.x + 28, restart_rect.y + 10))
+
+    return restart_rect
 
 # Constants 
 global selected_piece, valid_moves, current_turn
@@ -533,6 +565,8 @@ valid_moves = []
 show_popup = False
 popup_type = None   # 'promotion'
 promoting_pawn = None
+game_over_flag = False
+
 
 WIDTH, HEIGHT = 800, 800
 DIMENSION = 8
@@ -632,6 +666,9 @@ while running:
                 # Click is consumed by the popup — check promotion_rects below
                 pass
 
+            if game_over_flag:
+                pass  # ignore all clicks after game ends
+
             elif selected_piece is None:
                 for sprite in group:
                     if sprite.was_clicked(event) and sprite.color == current_turn:
@@ -705,6 +742,14 @@ while running:
                     switch_turns()
                     break
 
+    # After the promotion popup block:
+    if game_over_flag:
+        restart_rect = draw_game_over_popup()
+        mouse = pygame.mouse.get_pressed()
+        if mouse[0]:
+            if restart_rect.collidepoint(pygame.mouse.get_pos()):
+                # Just quit for now — wire up reset later
+                running = False
     pygame.display.flip()
     clock.tick(60)
 
