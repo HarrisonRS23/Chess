@@ -7,7 +7,7 @@ TODO:
 - Add draws
 - Add stalemate
 - Add resigning/reset
-- Add sidebar of some sort
+- Fix promoting into check or checking castle with dead rook
 """
 
 class ChessSprite(pygame.sprite.Sprite):
@@ -147,6 +147,10 @@ def castled_long(sprite):
 def kill_piece(col, row):
     for sprite in group:
         if sprite.col == col and sprite.row == row:
+            if sprite.color == 0:
+                killed_white_pieces.append(sprite)
+            else:
+                killed_black_pieces.append(sprite)
             sprite.kill()
 
 def get_valid_moves(sprite):
@@ -535,7 +539,6 @@ def game_over(is_checkmate):
     else:
         game_over_message = "Stalemate! It's a draw!"
 
-
 def draw_game_over_popup():
     overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
     overlay.fill((0, 0, 0, 150))
@@ -577,7 +580,7 @@ GRAY = (202, 203, 179)
 cellSize = WIDTH // DIMENSION
 
 pygame.init()
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
+screen = pygame.display.set_mode((WIDTH + 300, HEIGHT))
 pygame.display.set_caption("ChessBoard")
 clock = pygame.time.Clock()
 running = True
@@ -605,12 +608,14 @@ def draw_board(i, j):
                     continue
                 else:
                     pygame.draw.circle(board, GRAY, center, 10)
-    return board
 
+    
+
+
+    return board
 
 board = draw_board(-1, -1)
 board_rect = board.get_rect(topleft=(0, 0))
-
 
 def load_piece(color, name):
     path = os.path.join("Pieces", f"{color}{name}.png")
@@ -640,6 +645,70 @@ for i, fig in enumerate(back_rank):
     add_piece(i, 6, black_images, 1, 'p')
 
 font = pygame.font.SysFont(None, 36)
+
+killed_black_pieces = []
+killed_white_pieces = []
+
+def calculate_material():
+
+    piece_values = {'q': 9, 'r': 5, 'b': 3, 'n': 3, 'p': 1, 'k': 0}
+    white_material = 0
+    black_material = 0
+
+    for i in range(8):
+        for j in range(8):
+            cell = board_state[i][j]
+            if cell is not None:
+                value = piece_values[cell[2].piece_type]
+                if cell[0] == 0:
+                    white_material += value 
+                else:
+                    black_material += value
+
+    return white_material, black_material
+
+def draw_side_panel():
+    side_panel = pygame.Surface((400, 800))
+    side_panel.fill(BLACK)
+
+    white_material, black_material = calculate_material()
+    advantage = white_material - black_material
+
+    # --- Black section (top half) ---
+    black_label = font.render('Black', True, WHITE)
+    side_panel.blit(black_label, (20, 20))
+
+    # White pieces killed by black (shown under Black's label)
+    for i, piece in enumerate(killed_white_pieces):
+        x = 20 + (i % 8) * 28
+        y = 50 + (i // 8) * 28
+        side_panel.blit(pygame.transform.smoothscale(
+            white_images[piece.piece_type], (25, 25)), (x, y))
+
+    if advantage < 0:  # black is ahead
+        adv_label = font.render(f'+{abs(advantage)}', True, WHITE)
+        side_panel.blit(adv_label, (20, 110))
+
+
+    # --- White section (bottom half) ---
+    white_label = font.render('White', True, WHITE)
+    side_panel.blit(white_label, (20, 400))
+
+    # Black pieces killed by white (shown under White's label)
+    for i, piece in enumerate(killed_black_pieces):
+        x = 20 + (i % 8) * 28
+        y = 430 + (i // 8) * 28
+        side_panel.blit(pygame.transform.smoothscale(
+            black_images[piece.piece_type], (25, 25)), (x, y))
+
+    if advantage > 0:  # white is ahead
+        adv_label = font.render(f'+{advantage}', True, WHITE)
+        side_panel.blit(adv_label, (20, 490))
+
+    return side_panel
+
+side_panel = draw_side_panel()
+side_panel_rect = side_panel.get_rect(topleft=(WIDTH, 0))
 
 pygame.mixer.init()
 capture_sound = pygame.mixer.Sound('Effects/capture.mp3')
@@ -708,7 +777,9 @@ while running:
     if selected_piece is not None:
         board = draw_board(selected_piece.col, selected_piece.row)
 
+    side_panel = draw_side_panel()
     screen.blit(board, board_rect)
+    screen.blit(side_panel,side_panel_rect)
     group.draw(screen)
 
     label = font.render("White's Turn" if current_turn == 0 else "Black's Turn", True, WHITE)
