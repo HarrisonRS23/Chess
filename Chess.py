@@ -4,7 +4,6 @@ import os
 """
 TODO: 
 - Add en passant 
-- Add draws
 - Add stalemate
 - Add resigning/reset
 - Fix promoting into check or checking castle with dead rook
@@ -112,6 +111,9 @@ def execute_move(sprite, dst_col, dst_row):
         capture_sound.play()
     else:
         move_sound.play()
+
+    if is_draw():
+        game_over(False)
 
     switch_turns()
 
@@ -470,21 +472,20 @@ def draw_promotion_popup(color):
 
     return rects
 
-
-"""
-Generate the list of pseudo-legal moves for the side to move. 
-By pseudo-legal, I mean don't bother to verify whether the generated move leaves that side's King in check. 
-Omitting this verification can save time validating moves that are never searched.
-
-For each move that is searched, validate that it doesn't leave the side to move in check.
-
-If every move leaves the King in check, then the side to move has either been mated or it's stalemate.
-
-If the side to move is currently in check, then it's mate. Otherwise it's stalemate.
-
-"""
-
 def is_checkmate():
+
+    """
+    Generate the list of pseudo-legal moves for the side to move. 
+    By pseudo-legal, I mean don't bother to verify whether the generated move leaves that side's King in check. 
+    Omitting this verification can save time validating moves that are never searched.
+
+    For each move that is searched, validate that it doesn't leave the side to move in check.
+
+    If every move leaves the King in check, then the side to move has either been mated or it's stalemate.
+
+    If the side to move is currently in check, then it's mate. Otherwise it's stalemate.
+
+    """
 
     if get_king_moves(find_king_by_color(current_turn)) != []:
         return False
@@ -537,7 +538,7 @@ def game_over(is_checkmate):
     if is_checkmate:
         game_over_message = "Checkmate! " + ("White" if winner == 0 else "Black") + " wins!"
     else:
-        game_over_message = "Stalemate! It's a draw!"
+        game_over_message = "It's a draw!"
 
 def draw_game_over_popup():
     overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
@@ -559,6 +560,64 @@ def draw_game_over_popup():
     screen.blit(btn_label, (restart_rect.x + 28, restart_rect.y + 10))
 
     return restart_rect
+
+def is_draw():
+
+    white_material, black_material = calculate_material()
+
+    # Draws by insufficient material 
+
+    # only kings left in game
+
+    white_only_king = (white_material == 0)
+    black_only_king = (black_material == 0)
+
+    if white_only_king and black_only_king:
+        print('Draw by: two kings')
+        return True
+    
+    white_pieces = []
+    black_pieces = []
+
+    for i in range(8):
+        for j in range(8):
+            cell = board_state[i][j]
+            if cell is not None:
+                if cell[0] == 0:
+                    white_pieces.append(cell[1])
+                else:
+                    black_pieces.append(cell[1])
+           
+    white_only_minor = False
+    black_only_minor = False
+    if white_material == 3:
+        if 'p' not in white_pieces:
+            white_only_minor = True
+    if black_material == 3:
+        if 'p' not in black_pieces:
+            black_only_minor = True
+    
+
+    # Single minor piece e.g king vs king + bishop/knight
+    if (white_only_king and black_only_minor) or (black_only_king and white_only_minor):
+        print('draw by insufficient material: king vs minor piece')
+        return True
+
+    # Mirror minor piece e.g king + bishop/knight vs king + bishop/knight
+    if white_only_minor and black_only_minor:
+        print('draw by insufficient material: mirror minor piece ')
+        return True
+    
+    # 2 knights vs king e.g king vs king + knight + knight
+
+    if sorted(white_pieces) == ['k', 'n', 'n']:
+        print("draw by insufficient material: king vs two knights")
+        return True
+    
+    if sorted(black_pieces) == ['k', 'n', 'n']:
+        print("draw by insufficient material: king vs two knights")
+        return True
+    
 
 # Constants 
 global selected_piece, valid_moves, current_turn
