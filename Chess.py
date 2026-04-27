@@ -814,6 +814,11 @@ def draw_side_panel():
     side_panel = pygame.Surface((400, 800))
     side_panel.fill(BLACK)
 
+    restart_rect = pygame.Rect(60, 750, 160, 40)
+    pygame.draw.rect(side_panel, WHITE, restart_rect, border_radius=6)
+    btn_label = font.render("Play Again", True, BLACK)
+    side_panel.blit(btn_label, (restart_rect.x + 28, restart_rect.y + 10))
+
     white_material, black_material = calculate_material()
     advantage = white_material - black_material
 
@@ -965,6 +970,15 @@ while running:
                 reset_game()
                 game_over_flag = False
                 
+
+    restart_rect = pygame.Rect(WIDTH + 60, 750, 160, 40)
+    mouse = pygame.mouse.get_pressed()
+    if mouse[0]:
+        if restart_rect.collidepoint(pygame.mouse.get_pos()):
+            reset_game()
+            game_over_flag = False  # ← needed if resetting after game over
+
+
     pygame.display.flip()
     clock.tick(60)
 
