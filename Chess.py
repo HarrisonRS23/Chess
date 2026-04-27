@@ -3,7 +3,6 @@ import os
 
 """
 TODO: 
-- Add en passant 
 - Add stalemate
 - Add resigning/reset
 - Fix promoting into check or checking castle with dead rook
@@ -24,6 +23,9 @@ class ChessSprite(pygame.sprite.Sprite):
             self.has_moved = False
         if piece_type == 'k':
             self.has_moved = False
+        if piece_type == 'p':
+            self.enpassant = False
+            self.enpassant_col = -1
 
     def set_pos(self, i, j):
         board_state[self.col][self.row] = None
@@ -38,8 +40,6 @@ class ChessSprite(pygame.sprite.Sprite):
 
 
 def execute_move(sprite, dst_col, dst_row):
-
-    
 
     # Save state and simulate move for check validation
     original_src = board_state[sprite.col][sprite.row]
@@ -70,6 +70,7 @@ def execute_move(sprite, dst_col, dst_row):
 
     row = 0 if sprite.color == 0 else 7
 
+    # Add check to see if rook has moved
     if sprite.piece_type == 'k' and not sprite.has_moved:
         if (dst_col, dst_row) == (6, row):
             castled_short(sprite)
@@ -81,6 +82,20 @@ def execute_move(sprite, dst_col, dst_row):
             sprite.has_moved = True
             switch_turns()
             return
+        
+    original_row = sprite.row
+
+    # En passant capture: destination square is empty but we're capturing diagonally
+    is_enpassant = (
+        sprite.piece_type == 'p'
+        and dst_col != sprite.col
+        and board_state[dst_col][dst_row] is None
+    )
+    if is_enpassant:
+        captured_row = sprite.row  # the captured pawn is still on the moving pawn's row
+        board_state[dst_col][captured_row] = None
+        kill_piece(dst_col, captured_row)
+        killed = True
 
     sprite.set_pos(dst_col, dst_row)
 
@@ -115,6 +130,9 @@ def execute_move(sprite, dst_col, dst_row):
     if is_draw():
         game_over(False)
 
+    if sprite.piece_type == 'p' and abs(original_row - dst_row) == 2:
+        check_enpassant(dst_col, dst_row, sprite.color)
+
     switch_turns()
 
 def switch_turns():
@@ -124,6 +142,14 @@ def switch_turns():
     global selected_piece
     selected_piece = None
     print_chess_board()
+
+    # Clear en passant for the side that just moved — their window has now closed
+    for i in range(8):
+        for j in range(8):
+            cell = board_state[i][j]
+            # clears the previous player's flags (they missed their window)
+            if cell and cell[0] == (1 - current_turn) and cell[1] == 'p':                
+                cell[2].enpassant = False
 
     if(is_checkmate()):
         game_over(is_checkmate=True)
@@ -189,6 +215,13 @@ def get_pawn_moves(sprite):
         valid_moves.append((sprite.col - 1, sprite.row + direction))
 
     # En-passant (Implement Later)
+
+    # generate the move, don't touch the flag here
+    if sprite.enpassant:
+        dest_row = sprite.row + direction  # one step forward in moving direction
+        valid_moves.append((sprite.enpassant_col, dest_row))
+        
+
 
     return valid_moves
 
@@ -610,14 +643,30 @@ def is_draw():
     
     # 2 knights vs king e.g king vs king + knight + knight
 
-    if sorted(white_pieces) == ['k', 'n', 'n']:
+    if sorted(white_pieces) == ['k', 'n', 'n'] and black_material == 0:
         print("draw by insufficient material: king vs two knights")
         return True
     
-    if sorted(black_pieces) == ['k', 'n', 'n']:
+    if sorted(black_pieces) == ['k', 'n', 'n'] and white_material == 0:
         print("draw by insufficient material: king vs two knights")
         return True
     
+def check_enpassant(col, row, color):
+    if col + 1 < 8 and board_state[col + 1][row] is not None \
+            and board_state[col + 1][row][0] != color \
+            and board_state[col + 1][row][1] == 'p':
+        cell = board_state[col + 1][row]
+        cell[2].enpassant = True
+        cell[2].enpassant_col = col  # capture destination is the moved pawn's column
+
+    if col - 1 >= 0 and board_state[col - 1][row] is not None \
+            and board_state[col - 1][row][0] != color \
+            and board_state[col - 1][row][1] == 'p':
+        cell = board_state[col - 1][row]
+        cell[2].enpassant = True
+        cell[2].enpassant_col = col  # same — always col, not col±1
+
+
 
 # Constants 
 global selected_piece, valid_moves, current_turn
@@ -659,7 +708,16 @@ def draw_board(i, j):
             my_rect = pygame.Rect(x * cellSize, y * cellSize, cellSize, cellSize)
 
             if (x, 7-y) in valid_moves:
-                center = my_rect.center
+                center = my_rect.center  # ← move this up
+                is_ep_target = (
+                    selected_piece is not None
+                    and selected_piece.piece_type == 'p'
+                    and board_state[x][7-y] is None
+                    and x != selected_piece.col
+                )
+                if is_ep_target:
+                    pygame.draw.circle(board, GRAY, center, 49, 7)
+                    continue
                 if board_state[x][7-y] is not None and board_state[x][7-y][0] != selected_piece.color:
                     pygame.draw.circle(board, GRAY, center, 49, 7)
                     continue
