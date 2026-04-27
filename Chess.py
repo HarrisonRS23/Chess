@@ -3,7 +3,6 @@ import os
 
 """
 TODO: 
-- Add stalemate
 - Add resigning/reset
 - Fix promoting into check or checking castle with dead rook
 """
@@ -151,8 +150,8 @@ def switch_turns():
             if cell and cell[0] == (1 - current_turn) and cell[1] == 'p':                
                 cell[2].enpassant = False
 
-    if(is_checkmate()):
-        game_over(is_checkmate=True)
+    is_checkmate() # game_over is handled internally for both outcomes
+
 
 def castled_short(sprite):
     castle_sound.play()
