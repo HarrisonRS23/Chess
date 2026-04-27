@@ -4,6 +4,9 @@ import os
 """
 TODO: 
 
+- Add move counter to sidebar
+- Add move history
+
 """
 
 class ChessSprite(pygame.sprite.Sprite):
@@ -135,11 +138,11 @@ def execute_move(sprite, dst_col, dst_row):
 
 def switch_turns():
 
-    global current_turn
+    global current_turn, selected_piece, king_is_in_check
     current_turn = 1 - current_turn
-    global selected_piece
     selected_piece = None
     print_chess_board()
+    
 
     # Clear en passant for the side that just moved — their window has now closed
     for i in range(8):
@@ -149,7 +152,10 @@ def switch_turns():
             if cell and cell[0] == (1 - current_turn) and cell[1] == 'p':                
                 cell[2].enpassant = False
 
+    # Update check state for the new active player
+    king_is_in_check = king_in_check(find_king_by_color(current_turn), board_state)
     is_checkmate() # game_over is handled internally for both outcomes
+
 
 def castled_short(sprite):
     castle_sound.play()
@@ -570,7 +576,6 @@ def game_over(is_checkmate):
     if is_checkmate:
         game_over_message = "Checkmate! " + ("White" if winner == 0 else "Black") + " wins!"
     
-
 def draw_game_over_popup():
     overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
     overlay.fill((0, 0, 0, 150))
@@ -694,8 +699,8 @@ def reset_game():
     side_panel = draw_side_panel()
 
 
-# Constants 
-global selected_piece, valid_moves, current_turn, board, killed_black_pieces, killed_white_pieces, side_panel
+# Global state variables
+global selected_piece, valid_moves, current_turn, board, killed_black_pieces, killed_white_pieces, side_panel, king_is_in_check
 current_turn = 0
 selected_piece = None
 valid_moves = []
@@ -703,14 +708,16 @@ show_popup = False
 popup_type = None   # 'promotion'
 promoting_pawn = None
 game_over_flag = False
+king_is_in_check = False
 
-
+# Constants 
 WIDTH, HEIGHT = 800, 800
 DIMENSION = 8
 WHITE, BLACK = (255, 255, 255), (0, 0, 0)
 GREEN, CREAM = (115, 149, 82), (235, 236, 208)
 LIGHT_ORANGE = (186, 201, 73)
 GRAY = (202, 203, 179)
+RED = (255, 0, 0)
 cellSize = WIDTH // DIMENSION
 
 pygame.init()
@@ -720,12 +727,16 @@ clock = pygame.time.Clock()
 running = True
 
 def draw_board(i, j):
-    global valid_moves
+    global valid_moves, board_state
     board = pygame.Surface((cellSize * DIMENSION, cellSize * DIMENSION))
     board.fill(CREAM)
     for x in range(DIMENSION):
         for y in range(DIMENSION):
-            if x == i and y == (7 - j):
+            cell = board_state[x][7-y]
+            if king_is_in_check and cell is not None and cell[2].piece_type == 'k' and cell[0] == current_turn:
+                pygame.draw.rect(board, RED, (x * cellSize, y * cellSize, cellSize, cellSize))
+
+            elif x == i and y == (7 - j):
                 pygame.draw.rect(board, LIGHT_ORANGE, (x * cellSize, y * cellSize, cellSize, cellSize))
             elif (x + y) % 2 == 0:
                 pygame.draw.rect(board, GREEN, (x * cellSize, y * cellSize, cellSize, cellSize))
@@ -733,7 +744,7 @@ def draw_board(i, j):
             my_rect = pygame.Rect(x * cellSize, y * cellSize, cellSize, cellSize)
 
             if (x, 7-y) in valid_moves:
-                center = my_rect.center  # ← move this up
+                center = my_rect.center
                 is_ep_target = (
                     selected_piece is not None
                     and selected_piece.piece_type == 'p'
@@ -756,9 +767,6 @@ def draw_board(i, j):
 
     return board
 
-board = draw_board(-1, -1)
-board_rect = board.get_rect(topleft=(0, 0))
-
 def load_piece(color, name):
     path = os.path.join("Pieces", f"{color}{name}.png")
     image = pygame.image.load(path).convert_alpha()
@@ -773,6 +781,9 @@ global group
 board_state = [[None] * 8 for _ in range(8)]
 group = pygame.sprite.Group()
 
+
+board = draw_board(-1, -1)
+board_rect = board.get_rect(topleft=(0, 0))
 
 def add_piece(col, row, images, color, piece_type):
     sprite = ChessSprite(board_rect, col, row, images[piece_type], color, piece_type)
