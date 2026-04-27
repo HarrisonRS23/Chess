@@ -721,10 +721,19 @@ RED = (255, 0, 0)
 cellSize = WIDTH // DIMENSION
 
 pygame.init()
-screen = pygame.display.set_mode((WIDTH + 300, HEIGHT))
+screen = pygame.display.set_mode((WIDTH + 300, HEIGHT), pygame.RESIZABLE)
 pygame.display.set_caption("ChessBoard")
 clock = pygame.time.Clock()
 running = True
+fullscreen = False
+
+def toggle_fullscreen():
+    global screen, fullscreen
+    fullscreen = not fullscreen
+    if fullscreen:
+        screen = pygame.display.set_mode((WIDTH + 300, HEIGHT), pygame.FULLSCREEN)
+    else:
+        screen = pygame.display.set_mode((WIDTH + 300, HEIGHT), pygame.RESIZABLE)
 
 def draw_board(i, j):
     global valid_moves, board_state
@@ -915,6 +924,10 @@ while running:
     for event in event_list:
         if event.type == pygame.QUIT:
             running = False
+
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_f:
+                toggle_fullscreen()
 
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
 
