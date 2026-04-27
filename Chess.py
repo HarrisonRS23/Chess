@@ -3,7 +3,6 @@ import os
 
 """
 TODO: 
-- Add resigning/reset
 - Specify why the game ended
 """
 
@@ -151,7 +150,6 @@ def switch_turns():
                 cell[2].enpassant = False
 
     is_checkmate() # game_over is handled internally for both outcomes
-
 
 def castled_short(sprite):
     castle_sound.play()
@@ -667,10 +665,37 @@ def check_enpassant(col, row, color):
         cell[2].enpassant = True
         cell[2].enpassant_col = col  # same — always col, not col±1
 
+def reset_game():
+    global board, killed_black_pieces, killed_white_pieces, side_panel
+    global selected_piece, current_turn, valid_moves, board_state, group
+    global show_popup, popup_type, promoting_pawn
+
+    selected_piece = None
+    current_turn = 0
+    valid_moves = []
+    show_popup = False
+    popup_type = None
+    promoting_pawn = None
+
+    killed_black_pieces = []
+    killed_white_pieces = []
+
+    board_state = [[None] * 8 for _ in range(8)]
+    group.empty()
+
+    back_rank = ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r']
+    for i, fig in enumerate(back_rank):
+        add_piece(i, 0, white_images, 0, fig)
+        add_piece(i, 1, white_images, 0, 'p')
+        add_piece(i, 7, black_images, 1, fig)
+        add_piece(i, 6, black_images, 1, 'p')
+
+    board = draw_board(-1, -1)
+    side_panel = draw_side_panel()
 
 
 # Constants 
-global selected_piece, valid_moves, current_turn
+global selected_piece, valid_moves, current_turn, board, killed_black_pieces, killed_white_pieces, side_panel
 current_turn = 0
 selected_piece = None
 valid_moves = []
@@ -693,7 +718,6 @@ screen = pygame.display.set_mode((WIDTH + 300, HEIGHT))
 pygame.display.set_caption("ChessBoard")
 clock = pygame.time.Clock()
 running = True
-
 
 def draw_board(i, j):
     global valid_moves
@@ -745,6 +769,7 @@ piece_names = ['k', 'q', 'r', 'b', 'n', 'p']
 white_images = {name: load_piece("w", name) for name in piece_names}
 black_images = {name: load_piece("b", name) for name in piece_names}
 
+global group
 board_state = [[None] * 8 for _ in range(8)]
 group = pygame.sprite.Group()
 
@@ -937,8 +962,9 @@ while running:
         mouse = pygame.mouse.get_pressed()
         if mouse[0]:
             if restart_rect.collidepoint(pygame.mouse.get_pos()):
-                # Just quit for now — wire up reset later
-                running = False
+                reset_game()
+                game_over_flag = False
+                
     pygame.display.flip()
     clock.tick(60)
 
