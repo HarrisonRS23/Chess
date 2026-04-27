@@ -3,8 +3,6 @@ import os
 
 """
 TODO: 
-
-- Add move counter to sidebar
 - Add move history
 
 """
@@ -138,8 +136,9 @@ def execute_move(sprite, dst_col, dst_row):
 
 def switch_turns():
 
-    global current_turn, selected_piece, king_is_in_check
+    global current_turn, selected_piece, king_is_in_check,move_counter
     current_turn = 1 - current_turn
+    move_counter +=1
     selected_piece = None
     print_chess_board()
     
@@ -155,7 +154,6 @@ def switch_turns():
     # Update check state for the new active player
     king_is_in_check = king_in_check(find_king_by_color(current_turn), board_state)
     is_checkmate() # game_over is handled internally for both outcomes
-
 
 def castled_short(sprite):
     castle_sound.play()
@@ -673,10 +671,11 @@ def check_enpassant(col, row, color):
 def reset_game():
     global board, killed_black_pieces, killed_white_pieces, side_panel
     global selected_piece, current_turn, valid_moves, board_state, group
-    global show_popup, popup_type, promoting_pawn
+    global show_popup, popup_type, promoting_pawn, move_counter
 
     selected_piece = None
     current_turn = 0
+    move_counter = 0
     valid_moves = []
     show_popup = False
     popup_type = None
@@ -709,6 +708,7 @@ popup_type = None   # 'promotion'
 promoting_pawn = None
 game_over_flag = False
 king_is_in_check = False
+move_counter = 0
 
 # Constants 
 WIDTH, HEIGHT = 800, 800
@@ -885,6 +885,16 @@ def draw_side_panel():
         px = 15 + (i % 9) * 29
         py = y + (i // 9) * 29
         panel.blit(pygame.transform.smoothscale(black_images[piece.piece_type], (26, 26)), (px, py))
+
+
+    pygame.draw.line(panel, MID_GRAY, (15, y), (PANEL_W - 15, y))
+    y += 90
+    turn_text = 'Move count: ' + str(move_counter)
+    turn_surf = font.render(turn_text, True, WHITE if current_turn == 0 else LIGHT_GRAY)
+    panel.blit(turn_surf, (PANEL_W // 2 - turn_surf.get_width() // 2, y))
+    y += 30
+    pygame.draw.line(panel, MID_GRAY, (15, y), (PANEL_W - 15, y))
+    y += 14
 
     # ── Play Again button (pinned to bottom) ──────────────
     btn_y = HEIGHT - 60
