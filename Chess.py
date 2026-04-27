@@ -3,7 +3,7 @@ import os
 
 """
 TODO: 
-- Specify why the game ended
+
 """
 
 class ChessSprite(pygame.sprite.Sprite):
@@ -569,8 +569,7 @@ def game_over(is_checkmate):
     winner = 1 - current_turn
     if is_checkmate:
         game_over_message = "Checkmate! " + ("White" if winner == 0 else "Black") + " wins!"
-    else:
-        game_over_message = "It's a draw!"
+    
 
 def draw_game_over_popup():
     overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
@@ -603,9 +602,10 @@ def is_draw():
 
     white_only_king = (white_material == 0)
     black_only_king = (black_material == 0)
+    global game_over_message
 
     if white_only_king and black_only_king:
-        print('Draw by: two kings')
+        game_over_message = 'Draw by: two kings'
         return True
     
     white_pieces = []
@@ -632,22 +632,22 @@ def is_draw():
 
     # Single minor piece e.g king vs king + bishop/knight
     if (white_only_king and black_only_minor) or (black_only_king and white_only_minor):
-        print('draw by insufficient material: king vs minor piece')
+        game_over_message = 'draw by insufficient material: king vs minor piece'
         return True
 
     # Mirror minor piece e.g king + bishop/knight vs king + bishop/knight
     if white_only_minor and black_only_minor:
-        print('draw by insufficient material: mirror minor piece ')
+        game_over_message = 'draw by insufficient material: mirror minor piece '
         return True
     
     # 2 knights vs king e.g king vs king + knight + knight
 
     if sorted(white_pieces) == ['k', 'n', 'n'] and black_material == 0:
-        print("draw by insufficient material: king vs two knights")
+        game_over_message = "draw by insufficient material: king vs two knights"
         return True
     
     if sorted(black_pieces) == ['k', 'n', 'n'] and white_material == 0:
-        print("draw by insufficient material: king vs two knights")
+        game_over_message = "draw by insufficient material: king vs two knights"
         return True
     
 def check_enpassant(col, row, color):
@@ -810,50 +810,78 @@ def calculate_material():
 
     return white_material, black_material
 
-def draw_side_panel():
-    side_panel = pygame.Surface((400, 800))
-    side_panel.fill(BLACK)
+PANEL_W = 300
+DARK_GRAY = (30, 30, 30)
+MID_GRAY = (55, 55, 55)
+LIGHT_GRAY = (180, 180, 180)
 
-    restart_rect = pygame.Rect(60, 750, 160, 40)
-    pygame.draw.rect(side_panel, WHITE, restart_rect, border_radius=6)
-    btn_label = font.render("Play Again", True, BLACK)
-    side_panel.blit(btn_label, (restart_rect.x + 28, restart_rect.y + 10))
+def draw_side_panel():
+    panel = pygame.Surface((PANEL_W, HEIGHT))
+    panel.fill(DARK_GRAY)
+    pygame.draw.line(panel, MID_GRAY, (0, 0), (0, HEIGHT), 2)  # left border
 
     white_material, black_material = calculate_material()
     advantage = white_material - black_material
+    total = white_material + black_material
 
-    # --- Black section (top half) ---
-    black_label = font.render('Black', True, WHITE)
-    side_panel.blit(black_label, (20, 20))
+    y = 20
 
-    # White pieces killed by black (shown under Black's label)
+    # ── BLACK header ──────────────────────────────────────
+    pygame.draw.rect(panel, MID_GRAY, (15, y, PANEL_W - 30, 38), border_radius=8)
+    panel.blit(font.render('Black', True, WHITE), (25, y + 9))
+    if advantage < 0:
+        adv = font.render(f'+{abs(advantage)}', True, LIGHT_GRAY)
+        panel.blit(adv, (PANEL_W - adv.get_width() - 20, y + 9))
+    y += 48
+
+    # Captured white pieces (taken by black)
     for i, piece in enumerate(killed_white_pieces):
-        x = 20 + (i % 8) * 28
-        y = 50 + (i // 8) * 28
-        side_panel.blit(pygame.transform.smoothscale(
-            white_images[piece.piece_type], (25, 25)), (x, y))
+        px = 15 + (i % 9) * 29
+        py = y + (i // 9) * 29
+        panel.blit(pygame.transform.smoothscale(white_images[piece.piece_type], (26, 26)), (px, py))
+    capture_rows = max(1, (len(killed_white_pieces) + 8) // 9)
+    y += capture_rows * 29 + 12
 
-    if advantage < 0:  # black is ahead
-        adv_label = font.render(f'+{abs(advantage)}', True, WHITE)
-        side_panel.blit(adv_label, (20, 110))
+    # ── Material bar ──────────────────────────────────────
+    bar_rect = pygame.Rect(15, y, PANEL_W - 30, 8)
+    pygame.draw.rect(panel, WHITE, bar_rect, border_radius=4)
+    if total > 0:
+        black_w = int(bar_rect.width * (black_material / total))
+        pygame.draw.rect(panel, (80, 80, 80),
+                         (bar_rect.right - black_w, y, black_w, 8), border_radius=4)
+    y += 20
 
+    # ── Turn indicator ────────────────────────────────────
+    pygame.draw.line(panel, MID_GRAY, (15, y), (PANEL_W - 15, y))
+    y += 14
+    turn_text = "White's Turn" if current_turn == 0 else "Black's Turn"
+    turn_surf = font.render(turn_text, True, WHITE if current_turn == 0 else LIGHT_GRAY)
+    panel.blit(turn_surf, (PANEL_W // 2 - turn_surf.get_width() // 2, y))
+    y += 30
+    pygame.draw.line(panel, MID_GRAY, (15, y), (PANEL_W - 15, y))
+    y += 14
 
-    # --- White section (bottom half) ---
-    white_label = font.render('White', True, WHITE)
-    side_panel.blit(white_label, (20, 400))
+    # ── WHITE header ──────────────────────────────────────
+    pygame.draw.rect(panel, MID_GRAY, (15, y, PANEL_W - 30, 38), border_radius=8)
+    panel.blit(font.render('White', True, WHITE), (25, y + 9))
+    if advantage > 0:
+        adv = font.render(f'+{advantage}', True, LIGHT_GRAY)
+        panel.blit(adv, (PANEL_W - adv.get_width() - 20, y + 9))
+    y += 48
 
-    # Black pieces killed by white (shown under White's label)
+    # Captured black pieces (taken by white)
     for i, piece in enumerate(killed_black_pieces):
-        x = 20 + (i % 8) * 28
-        y = 430 + (i // 8) * 28
-        side_panel.blit(pygame.transform.smoothscale(
-            black_images[piece.piece_type], (25, 25)), (x, y))
+        px = 15 + (i % 9) * 29
+        py = y + (i // 9) * 29
+        panel.blit(pygame.transform.smoothscale(black_images[piece.piece_type], (26, 26)), (px, py))
 
-    if advantage > 0:  # white is ahead
-        adv_label = font.render(f'+{advantage}', True, WHITE)
-        side_panel.blit(adv_label, (20, 490))
+    # ── Play Again button (pinned to bottom) ──────────────
+    btn_y = HEIGHT - 60
+    pygame.draw.rect(panel, GREEN, (15, btn_y, PANEL_W - 30, 40), border_radius=8)
+    btn = font.render("Play Again", True, WHITE)
+    panel.blit(btn, (PANEL_W // 2 - btn.get_width() // 2, btn_y + 10))
 
-    return side_panel
+    return panel
 
 side_panel = draw_side_panel()
 side_panel_rect = side_panel.get_rect(topleft=(WIDTH, 0))
@@ -930,9 +958,6 @@ while running:
     screen.blit(side_panel,side_panel_rect)
     group.draw(screen)
 
-    label = font.render("White's Turn" if current_turn == 0 else "Black's Turn", True, WHITE)
-    screen.blit(label, (10, 10))
-
     if show_popup and popup_type == 'promotion':
         promotion_rects = draw_promotion_popup(promoting_pawn.color)
 
@@ -971,7 +996,7 @@ while running:
                 game_over_flag = False
                 
 
-    restart_rect = pygame.Rect(WIDTH + 60, 750, 160, 40)
+    restart_rect = pygame.Rect(WIDTH + 15, HEIGHT - 60, PANEL_W - 30, 40)
     mouse = pygame.mouse.get_pressed()
     if mouse[0]:
         if restart_rect.collidepoint(pygame.mouse.get_pos()):
