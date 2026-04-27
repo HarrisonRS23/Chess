@@ -1,5 +1,7 @@
 import pygame
 import os
+from stockfish import Stockfish
+
 
 """
 TODO: 
@@ -36,7 +38,6 @@ class ChessSprite(pygame.sprite.Sprite):
 
     def was_clicked(self, event):
         return self.rect.collidepoint(event.pos)
-
 
 def execute_move(sprite, dst_col, dst_row):
 
@@ -104,12 +105,17 @@ def execute_move(sprite, dst_col, dst_row):
     promote_row = 0 if sprite.color == 1 else 7
 
     if(sprite.piece_type == 'p' and sprite.row == promote_row):
-        global show_popup, popup_type, promoting_pawn
-        show_popup = True
-        popup_type = 'promotion'
-        promoting_pawn = sprite
-        # Sound and turn switch happen after promotion choice, so return early
-        return
+        # If it's the engine's turn (color 1), automatically promote to Queen
+        if current_turn == 1:
+            sprite.piece_type = 'q'
+            sprite.image = pygame.transform.smoothscale(black_images['q'], (cellSize, cellSize))
+        else:
+            global show_popup, popup_type, promoting_pawn
+            show_popup = True
+            popup_type = 'promotion'
+            promoting_pawn = sprite
+            # Sound and turn switch happen after promotion choice, so return early
+            return
         
 
     # Write the moved piece into its new square
@@ -135,25 +141,26 @@ def execute_move(sprite, dst_col, dst_row):
     switch_turns()
 
 def switch_turns():
-
-    global current_turn, selected_piece, king_is_in_check,move_counter
+    global current_turn, selected_piece, king_is_in_check
     current_turn = 1 - current_turn
-    move_counter +=1
     selected_piece = None
     print_chess_board()
-    
 
-    # Clear en passant for the side that just moved — their window has now closed
     for i in range(8):
         for j in range(8):
             cell = board_state[i][j]
-            # clears the previous player's flags (they missed their window)
-            if cell and cell[0] == (1 - current_turn) and cell[1] == 'p':                
+            if cell and cell[0] == (1 - current_turn) and cell[1] == 'p':
                 cell[2].enpassant = False
 
-    # Update check state for the new active player
     king_is_in_check = king_in_check(find_king_by_color(current_turn), board_state)
-    is_checkmate() # game_over is handled internally for both outcomes
+    
+    if is_checkmate():
+        return
+
+    # Engine plays as black (color 1)
+    if current_turn == 1:
+        global engine_pending
+        engine_pending = True
 
 def castled_short(sprite):
     castle_sound.play()
@@ -726,6 +733,8 @@ pygame.display.set_caption("ChessBoard")
 clock = pygame.time.Clock()
 running = True
 
+engine_pending = False
+
 def draw_board(i, j):
     global valid_moves, board_state
     board = pygame.Surface((cellSize * DIMENSION, cellSize * DIMENSION))
@@ -915,6 +924,49 @@ illegal_sound = pygame.mixer.Sound('Effects/illegal.mp3')
 move_sound = pygame.mixer.Sound('Effects/move-self.mp3')
 check_sound = pygame.mixer.Sound('Effects/move-check.mp3')
 
+# Engine Logic
+engine = Stockfish(path="/opt/homebrew/bin/stockfish")
+engine.set_skill_level(20)  # 0 (easiest) to 20 (hardest)
+
+def board_to_fen():
+    piece_map = {'q': 'q', 'r': 'r', 'b': 'b', 'n': 'n', 'p': 'p', 'k': 'k'}
+    rows = []
+    for row in range(7, -1, -1):
+        empty = 0
+        row_str = ''
+        for col in range(8):
+            cell = board_state[col][row]
+            if cell is None:
+                empty += 1
+            else:
+                if empty:
+                    row_str += str(empty)
+                    empty = 0
+                piece = piece_map[cell[1]]
+                row_str += piece.upper() if cell[0] == 0 else piece
+        if empty:
+            row_str += str(empty)
+        rows.append(row_str)
+
+    turn = 'w' if current_turn == 0 else 'b'
+    return '/'.join(rows) + f' {turn} - - 0 1'
+
+def make_engine_move():
+    fen = board_to_fen()
+    engine.set_fen_position(fen)
+    best_move = engine.get_best_move()  # returns e.g. "e2e4"
+    if best_move is None:
+        return
+
+    # Convert algebraic to your col/row format
+    src_col = ord(best_move[0]) - ord('a')
+    src_row = int(best_move[1]) - 1
+    dst_col = ord(best_move[2]) - ord('a')
+    dst_row = int(best_move[3]) - 1
+
+    cell = board_state[src_col][src_row]
+    if cell:
+        execute_move(cell[2], dst_col, dst_row)
 
 # Game Loop
 while running:
@@ -1024,8 +1076,11 @@ while running:
             reset_game()
             game_over_flag = False  # ← needed if resetting after game over
 
-
+    
     pygame.display.flip()
+    if engine_pending:
+        engine_pending = False
+        make_engine_move()
     clock.tick(60)
 
 pygame.quit()
