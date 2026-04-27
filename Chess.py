@@ -4,7 +4,7 @@ import os
 """
 TODO: 
 - Add resigning/reset
-- Fix promoting into check or checking castle with dead rook
+- Specify why the game ended
 """
 
 class ChessSprite(pygame.sprite.Sprite):
@@ -348,7 +348,8 @@ def can_castle_short(sprite):
     for i in range(2):
         if board_state[5+i][row] is not None:
             return False
-    if board_state[7][row] is not None and board_state[7][row][2].has_moved == False:
+    cell = board_state[7][row]
+    if cell is not None and cell[0] == sprite.color and board_state[7][row][2].has_moved == False:
         return True
     return False
 
@@ -357,7 +358,8 @@ def can_castle_long(sprite):
     for i in range(3):
         if board_state[3-i][row] is not None:
             return False
-    if board_state[0][row] is not None and board_state[0][row][2].has_moved == False:
+    cell = board_state[0][row]
+    if cell is not None and cell[0] == sprite.color and board_state[0][row][2].has_moved == False:
         return True
     return False
 
